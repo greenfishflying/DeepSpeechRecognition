@@ -125,6 +125,7 @@ class get_data():
                 [self.pny2id(line, self.pny_vocab) + [0] * (max_len - len(line)) for line in input_batch])
             label_batch = np.array(
                 [self.han2id(line, self.han_vocab) + [0] * (max_len - len(line)) for line in label_batch])
+
             yield input_batch, label_batch
 
     def pny2id(self, line, vocab):

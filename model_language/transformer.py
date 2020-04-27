@@ -317,7 +317,7 @@ class Lm():
             self.istarget = tf.to_float(tf.not_equal(self.y, 0))
             self.acc = tf.reduce_sum(tf.to_float(tf.equal(self.preds, self.y))*self.istarget)/ (tf.reduce_sum(self.istarget))
             tf.summary.scalar('acc', self.acc)
-                        
+
             if self.is_training:  
                 # Loss
                 self.y_smoothed = label_smoothing(tf.one_hot(self.y, depth=self.label_vocab_size))
