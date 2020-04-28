@@ -8,11 +8,12 @@ from keras.callbacks import ModelCheckpoint
 data_args = data_hparams()
 data_args.data_type = 'train'
 data_args.data_path = './data/'
-data_args.thchs30 = True
-data_args.aishell = True
-data_args.prime = True
-data_args.stcmd = True
-data_args.batch_size = 10
+data_args.thchs30 = False
+data_args.aishell = False
+data_args.prime = False
+data_args.stcmd = False
+data_args.zanghua = True
+data_args.batch_size = 4
 data_args.data_length = 10
 # data_args.data_length = None
 data_args.shuffle = True
@@ -22,23 +23,24 @@ train_data = get_data(data_args)
 data_args = data_hparams()
 data_args.data_type = 'dev'
 data_args.data_path = './data/'
-data_args.thchs30 = True
-data_args.aishell = True
-data_args.prime = True
-data_args.stcmd = True
-data_args.batch_size = 4
+data_args.thchs30 = False
+data_args.aishell = False
+data_args.prime = False
+data_args.stcmd = False
+data_args.zanghua = True
+data_args.batch_size = 2
 # data_args.data_length = None
 data_args.data_length = 10
 data_args.shuffle = True
 dev_data = get_data(data_args)
-#
+
 # 1.声学模型训练-----------------------------------
 from model_speech.cnn_ctc import Am, am_hparams
 am_args = am_hparams()
 am_args.vocab_size = len(train_data.am_vocab)
 am_args.gpu_nums = 1
 am_args.lr = 0.0008
-am_args.is_training = False
+am_args.is_training = True
 am = Am(am_args)
 
 if os.path.exists('logs_am/model.h5'):
@@ -47,7 +49,7 @@ if os.path.exists('logs_am/model.h5'):
 
 epochs = 2
 batch_num = len(train_data.wav_lst) // train_data.batch_size
-#
+
 # checkpoint
 ckpt = "model_{epoch:02d}-{val_acc:.2f}.hdf5"
 checkpoint = ModelCheckpoint(os.path.join('./checkpoint', ckpt), monitor='val_loss', save_weights_only=False, verbose=1, save_best_only=True)
@@ -57,12 +59,12 @@ for k in range(epochs):
     print('this is the', k+1, 'th epochs trainning !!!')
     batch = train_data.get_am_batch()
     dev_batch = dev_data.get_am_batch()
-    am.ctc_model.fit_generator(batch, steps_per_epoch=batch_num, epochs=5, callbacks=[checkpoint], workers=1, use_multiprocessing=False, validation_data=dev_batch, validation_steps=200)
+    am.ctc_model.fit_generator(batch, steps_per_epoch=batch_num, epochs=1, callbacks=[checkpoint], workers=1, use_multiprocessing=False, validation_data=dev_batch, validation_steps=200)
 
 batch = train_data.get_am_batch()
 dev_batch = dev_data.get_am_batch()
 
-am.ctc_model.fit_generator(batch, steps_per_epoch=batch_num, epochs=5, callbacks=[checkpoint], workers=1, use_multiprocessing=False, validation_data=dev_batch, validation_steps=200)
+am.ctc_model.fit_generator(batch, steps_per_epoch=batch_num, epochs=2, callbacks=[checkpoint], workers=1, use_multiprocessing=False, validation_data=dev_batch, validation_steps=200)
 am.ctc_model.save_weights('logs_am/model.h5')
 
 
@@ -80,7 +82,7 @@ lm_args.lr = 0.0003
 lm_args.is_training = True
 lm = Lm(lm_args)
 
-epochs = 300
+epochs = 10
 with lm.graph.as_default():
     saver =tf.train.Saver()
 with tf.Session(graph=lm.graph) as sess:
@@ -90,12 +92,8 @@ with tf.Session(graph=lm.graph) as sess:
     if os.path.exists('logs_lm/checkpoint'):
         print('loading language model...')
         latest = tf.train.latest_checkpoint('logs_lm')
-        try:
-            add_num = int(latest.split('_')[-1])
-
-            saver.restore(sess, latest)
-        except:
-            add_num = 0
+        add_num = int(latest.split('_')[-1])
+        saver.restore(sess, latest)
     writer = tf.summary.FileWriter('logs_lm/tensorboard', tf.get_default_graph())
     for k in range(epochs):
         total_loss = 0

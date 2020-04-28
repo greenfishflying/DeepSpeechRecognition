@@ -18,6 +18,7 @@ def data_hparams():
         aishell=True,
         prime=True,
         stcmd=True,
+        zanghua = True,
         batch_size=1,
         data_length=10,
         shuffle=True)
@@ -35,6 +36,7 @@ class get_data():
         self.data_length = args.data_length
         self.batch_size = args.batch_size
         self.shuffle = args.shuffle
+        self.zanghua = args.zanghua
         self.source_init()
 
     def source_init(self):
@@ -49,16 +51,23 @@ class get_data():
                 read_files.append('prime.txt')
             if self.stcmd == True:
                 read_files.append('stcmd.txt')
+            if self.zanghua == True:
+                read_files.append('new_train.txt')
         elif self.data_type == 'dev':
             if self.thchs30 == True:
                 read_files.append('thchs_dev.txt')
             if self.aishell == True:
                 read_files.append('aishell_dev.txt')
+            if self.zanghua == True:
+                read_files.append('new_test.txt')
         elif self.data_type == 'test':
             if self.thchs30 == True:
                 read_files.append('thchs_test.txt')
             if self.aishell == True:
                 read_files.append('aishell_test.txt')
+            if self.zanghua == True:
+                read_files.append('new_test.txt')
+        print("read_files",read_files)
         self.wav_lst = []
         self.pny_lst = []
         self.han_lst = []
