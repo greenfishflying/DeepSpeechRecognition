@@ -5,7 +5,7 @@ import tensorflow as tf
 import scipy.io.wavfile as wav
 from tqdm import tqdm
 from scipy.fftpack import fft
-from python_speech_features import mfcc
+# from python_speech_features import mfcc
 from random import shuffle
 from keras import backend as K
 
@@ -13,14 +13,15 @@ def data_hparams():
     params = tf.contrib.training.HParams(
         # vocab
         data_type='train',
-        data_path='data/',
-        thchs30=True,
-        aishell=True,
-        prime=True,
-        stcmd=True,
+        data_path='./data/',
+        zanghua = True,
+        thchs30=False,
+        aishell=False,
+        prime=False,
+        stcmd=False,
         batch_size=1,
-        data_length=10,
-        shuffle=True)
+        data_length=200000,
+        shuffle=False)
     return params
 
 
@@ -35,11 +36,13 @@ class get_data():
         self.data_length = args.data_length
         self.batch_size = args.batch_size
         self.shuffle = args.shuffle
+        self.zanghua = args.zanghua
         self.source_init()
 
     def source_init(self):
         print('get source list...')
         read_files = []
+        print("=====================data_type,",self.data_type)
         if self.data_type == 'train':
             if self.thchs30 == True:
                 read_files.append('thchs_train.txt')
@@ -49,16 +52,23 @@ class get_data():
                 read_files.append('prime.txt')
             if self.stcmd == True:
                 read_files.append('stcmd.txt')
+            if self.zanghua == True:
+                read_files.append('train_all.txt')
         elif self.data_type == 'dev':
             if self.thchs30 == True:
                 read_files.append('thchs_dev.txt')
             if self.aishell == True:
                 read_files.append('aishell_dev.txt')
+            if self.zanghua == True:
+                read_files.append('test_all.txt')
         elif self.data_type == 'test':
             if self.thchs30 == True:
                 read_files.append('thchs_test.txt')
             if self.aishell == True:
                 read_files.append('aishell_test.txt')
+            if self.zanghua == True:
+                read_files.append('test_all.txt')
+        print("read_files",read_files)
         self.wav_lst = []
         self.pny_lst = []
         self.han_lst = []
@@ -74,12 +84,16 @@ class get_data():
                 self.han_lst.append(han.strip('\n'))
         if self.data_length:
             self.wav_lst = self.wav_lst[:self.data_length]
+            print("==============wav",len(self.wav_lst))
             self.pny_lst = self.pny_lst[:self.data_length]
+            print("==============加载了pny", len(self.pny_lst))
             self.han_lst = self.han_lst[:self.data_length]
+            print("==============加载了han", len(self.han_lst))
         print('make am vocab...')
         self.am_vocab = self.mk_am_vocab(self.pny_lst)
         print('make lm pinyin vocab...')
         self.pny_vocab = self.mk_lm_pny_vocab(self.pny_lst)
+
         print('make lm hanzi vocab...')
         self.han_vocab = self.mk_lm_han_vocab(self.han_lst)
 
@@ -88,13 +102,19 @@ class get_data():
         while 1:
             if self.shuffle == True:
                 shuffle(shuffle_list)
+                # print(shuffle_list)
             for i in range(len(self.wav_lst) // self.batch_size):
                 wav_data_lst = []
                 label_data_lst = []
+                # print("len label",len(label_data_lst))
                 begin = i * self.batch_size
+                # print("begin",begin)
                 end = begin + self.batch_size
+                # print("end", end)
                 sub_list = shuffle_list[begin:end]
+                # print("sub_list",sub_list)
                 for index in sub_list:
+                    # print("reading....",self.data_path + self.wav_lst[index])
                     fbank = compute_fbank(self.data_path + self.wav_lst[index])
                     pad_fbank = np.zeros((fbank.shape[0] // 8 * 8 + 8, fbank.shape[1]))
                     pad_fbank[:fbank.shape[0], :] = fbank
@@ -110,7 +130,10 @@ class get_data():
                           'input_length': input_length,
                           'label_length': label_length,
                           }
+                # print("inputs success")
+                # print("label_length",label_length)
                 outputs = {'ctc': np.zeros(pad_wav_data.shape[0], )}
+                # print("outputs", outputs['ctc'].shape)
                 yield inputs, outputs
 
     def get_lm_batch(self):
@@ -125,6 +148,7 @@ class get_data():
                 [self.pny2id(line, self.pny_vocab) + [0] * (max_len - len(line)) for line in input_batch])
             label_batch = np.array(
                 [self.han2id(line, self.han_vocab) + [0] * (max_len - len(line)) for line in label_batch])
+
             yield input_batch, label_batch
 
     def pny2id(self, line, vocab):
@@ -175,6 +199,7 @@ class get_data():
             for han in line:
                 if han not in vocab:
                     vocab.append(han)
+
         return vocab
 
     def ctc_len(self, label):
@@ -210,9 +235,14 @@ def compute_fbank(file):
         p_start = i * 160
         p_end = p_start + 400
         data_line = wav_arr[p_start:p_end]
-        data_line = data_line * w  # 加窗
-        data_line = np.abs(fft(data_line))
-        data_input[i] = data_line[0:200]  # 设置为400除以2的值（即200）是取一半数据，因为是对称的
+        try:
+            if len(data_line)==400:
+                # print("=========",data_line.shape)
+                data_line = data_line * w  # 加窗
+                data_line = np.abs(fft(data_line))
+                data_input[i] = data_line[0:200]  # 设置为400除以2的值（即200）是取一半数据，因为是对称的
+        except:
+            pass
     data_input = np.log(data_input + 1)
     # data_input = data_input[::]
     return data_input
@@ -243,3 +273,22 @@ def decode_ctc(num_result, num2word):
 	for i in r1:
 		text.append(num2word[i])
 	return r1, text
+def cal_ctc_acc(x,y):
+    # n = len(y)
+    # k=0.0
+    #
+    # for i in range(n):
+    #     try:
+    #         if x[i]==y[i]:
+    #             k+=1
+    #         elif x[i+1]==y[i] or x[i]==y[i+1]:
+    #             k+=1
+    #     except:
+    #         break
+    # # print("k,n=",k,n)
+    # return k/n
+    word_error_num = 0
+    word_num = 0
+    word_error_num += min(len(y), GetEditDistance(y, x))
+    word_num += len(y)
+    return word_error_num / word_num
